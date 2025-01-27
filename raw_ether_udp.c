@@ -78,27 +78,27 @@ int main(int argc, char *argv[])
     // Construct the Ethernet header
     int tx_len = 0;
     char sendbuf[1024];
-    struct ether_header *eh = (struct ether_header *)sendbuf;
+    struct ethhdr *eh = (struct ethhdr *)sendbuf;
     memset(sendbuf, 0, 1024);
 
     /* Ethernet header */
-    eh->ether_shost[0] = ((uint8_t *)&if_mac.ifr_hwaddr.sa_data)[0];
-    eh->ether_shost[1] = ((uint8_t *)&if_mac.ifr_hwaddr.sa_data)[1];
-    eh->ether_shost[2] = ((uint8_t *)&if_mac.ifr_hwaddr.sa_data)[2];
-    eh->ether_shost[3] = ((uint8_t *)&if_mac.ifr_hwaddr.sa_data)[3];
-    eh->ether_shost[4] = ((uint8_t *)&if_mac.ifr_hwaddr.sa_data)[4];
-    eh->ether_shost[5] = ((uint8_t *)&if_mac.ifr_hwaddr.sa_data)[5];
-    eh->ether_dhost[0] = 0x00;
-    eh->ether_dhost[1] = 0x01;
-    eh->ether_dhost[2] = 0x02;
-    eh->ether_dhost[3] = 0x03;
-    eh->ether_dhost[4] = 0x04;
-    eh->ether_dhost[5] = 0x05;
-    eh->ether_type = htons(ETH_P_IP);
-    tx_len += sizeof(struct ether_header);
+    eh->h_source[0] = ((uint8_t *)&if_mac.ifr_hwaddr.sa_data)[0];
+    eh->h_source[1] = ((uint8_t *)&if_mac.ifr_hwaddr.sa_data)[1];
+    eh->h_source[2] = ((uint8_t *)&if_mac.ifr_hwaddr.sa_data)[2];
+    eh->h_source[3] = ((uint8_t *)&if_mac.ifr_hwaddr.sa_data)[3];
+    eh->h_source[4] = ((uint8_t *)&if_mac.ifr_hwaddr.sa_data)[4];
+    eh->h_source[5] = ((uint8_t *)&if_mac.ifr_hwaddr.sa_data)[5];
+    eh->h_dest[0] = 0x00;
+    eh->h_dest[1] = 0x01;
+    eh->h_dest[2] = 0x02;
+    eh->h_dest[3] = 0x03;
+    eh->h_dest[4] = 0x04;
+    eh->h_dest[5] = 0x05;
+    eh->h_proto = htons(ETH_P_IP);
+    tx_len += sizeof(struct ethhdr);
 
     // Construct the IP header
-    struct iphdr *iph = (struct iphdr *)(sendbuf + sizeof(struct ether_header));
+    struct iphdr *iph = (struct iphdr *)(sendbuf + sizeof(struct ethhdr));
 
     /* IP Header */
     iph->ihl = 5;
@@ -115,7 +115,7 @@ int main(int argc, char *argv[])
     tx_len += sizeof(struct iphdr);
 
     // Construct the UDP packet
-    struct udphdr *udph = (struct udphdr *)(sendbuf + sizeof(struct iphdr) + sizeof(struct ether_header));
+    struct udphdr *udph = (struct udphdr *)(sendbuf + sizeof(struct iphdr) + sizeof(struct ethhdr));
 
     /* UDP Header */
     udph->source = htons(3423);
@@ -140,11 +140,11 @@ int main(int argc, char *argv[])
     }
 
     /* Length of UDP payload and header */
-    udph->len = htons(tx_len - sizeof(struct ether_header) - sizeof(struct iphdr));
+    udph->len = htons(tx_len - sizeof(struct ethhdr) - sizeof(struct iphdr));
     /* Length of IP payload and header */
-    iph->tot_len = htons(tx_len - sizeof(struct ether_header));
+    iph->tot_len = htons(tx_len - sizeof(struct ethhdr));
     /* Calculate IP checksum on completed header */
-    iph->check = csum((unsigned short *)(sendbuf + sizeof(struct ether_header)), sizeof(struct iphdr) / 2);
+    iph->check = csum((unsigned short *)(sendbuf + sizeof(struct ethhdr)), sizeof(struct iphdr) / 2);
 
     /* Destination address */
     struct sockaddr_ll socket_address;
