@@ -62,6 +62,41 @@ int main(int argc, char *argv[])
         printf("Index for interface %s is %d\n", if_idx.ifr_name, if_idx.ifr_ifindex);
     }
 
+    // Get the MAC address of the sender interface
+    struct ifreq if_mac;
+
+    memset(&if_mac, 0, sizeof(struct ifreq));
+    strncpy(if_mac.ifr_name, "wlp2s0", IFNAMSIZ - 1);
+
+    if (ioctl(sockfd, SIOCGIFHWADDR, &if_mac) < 0)
+    {
+        perror("SIOCGIFHWADDR");
+    }
+    else
+    {
+        printf("MAC address for interface %s is ", if_mac.ifr_name);
+        for (int i = 0; i < 6; i++)
+        {
+            printf("%02x:", (unsigned char)if_mac.ifr_hwaddr.sa_data[i]);
+        }
+        printf("\n");
+    }
+
+    // Get the IP address of the sender interface
+    struct ifreq if_ip;
+
+    memset(&if_ip, 0, sizeof(struct ifreq));
+    strncpy(if_ip.ifr_name, "wlp2s0", IFNAMSIZ - 1);
+
+    if (ioctl(sockfd, SIOCGIFADDR, &if_ip) < 0)
+    {
+        perror("SIOCGIFADDR");
+    }
+    else
+    {
+        printf("IP address for interface %s is %s\n", if_ip.ifr_name, inet_ntoa(((struct sockaddr_in *)&if_ip.ifr_addr)->sin_addr));
+    }
+
     // Construct the Ethernet header
     int tx_len = 0;
     char sendbuf[1024];
@@ -69,18 +104,18 @@ int main(int argc, char *argv[])
     memset(sendbuf, 0, 1024);
 
     /* Ethernet header */
-    eh->h_source[0] = 0x06;
-    eh->h_source[1] = 0x07;
-    eh->h_source[2] = 0x08;
-    eh->h_source[3] = 0x09;
-    eh->h_source[4] = 0x0a;
-    eh->h_source[5] = 0x0b;
-    eh->h_dest[0] = 0x00;
-    eh->h_dest[1] = 0x01;
-    eh->h_dest[2] = 0x02;
-    eh->h_dest[3] = 0x03;
-    eh->h_dest[4] = 0x04;
-    eh->h_dest[5] = 0x05;
+    eh->h_source[0] = ((uint8_t *)&if_mac.ifr_hwaddr.sa_data)[0];
+    eh->h_source[1] = ((uint8_t *)&if_mac.ifr_hwaddr.sa_data)[1];
+    eh->h_source[2] = ((uint8_t *)&if_mac.ifr_hwaddr.sa_data)[2];
+    eh->h_source[3] = ((uint8_t *)&if_mac.ifr_hwaddr.sa_data)[3];
+    eh->h_source[4] = ((uint8_t *)&if_mac.ifr_hwaddr.sa_data)[4];
+    eh->h_source[5] = ((uint8_t *)&if_mac.ifr_hwaddr.sa_data)[5];
+    eh->h_dest[0] = 0x02;
+    eh->h_dest[1] = 0x42;
+    eh->h_dest[2] = 0xac;
+    eh->h_dest[3] = 0x12;
+    eh->h_dest[4] = 0x00;
+    eh->h_dest[5] = 0x02;
     eh->h_proto = htons(ETH_P_IP);
     tx_len += sizeof(struct ethhdr);
 
@@ -95,9 +130,9 @@ int main(int argc, char *argv[])
     iph->ttl = 64;
     iph->protocol = 6; // TCP
     /* Source IP address, can be spoofed */
-    iph->saddr = inet_addr("192.168.0.240");
+    iph->saddr = inet_addr(inet_ntoa(((struct sockaddr_in *)&if_ip.ifr_addr)->sin_addr));
     /* Destination IP address */
-    iph->daddr = inet_addr("192.168.0.183");
+    iph->daddr = inet_addr("172.18.0.2");
     tx_len += sizeof(struct iphdr);
 
     // Construct the TCP packet
@@ -155,12 +190,12 @@ int main(int argc, char *argv[])
     /* Address length*/
     socket_address.sll_halen = ETH_ALEN;
     /* Destination MAC */
-    socket_address.sll_addr[0] = 0x00;
-    socket_address.sll_addr[1] = 0x01;
-    socket_address.sll_addr[2] = 0x02;
-    socket_address.sll_addr[3] = 0x03;
-    socket_address.sll_addr[4] = 0x04;
-    socket_address.sll_addr[5] = 0x05;
+    socket_address.sll_addr[0] = 0x02;
+    socket_address.sll_addr[1] = 0x42;
+    socket_address.sll_addr[2] = 0xac;
+    socket_address.sll_addr[3] = 0x12;
+    socket_address.sll_addr[4] = 0x00;
+    socket_address.sll_addr[5] = 0x02;
 
     /* Send packet */
     if (sendto(sockfd, sendbuf, tx_len, 0, (struct sockaddr *)&socket_address, sizeof(struct sockaddr_ll)) < 0)
